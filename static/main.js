@@ -5,7 +5,7 @@ var peer;
 function start() {
   local = document.getElementById('local');
   navigator.mediaDevices.getUserMedia({
-    audio: false,
+    audio: true,
     video: true
   }).then(stream => {
     local.srcObject = stream;

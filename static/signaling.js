@@ -33,7 +33,7 @@ socket.on('request-call', ({ caller, candidate, sdp }) => {
       });
     })
   }
-
+  getRemoteStream();
 });
 
 // recieve answer from user

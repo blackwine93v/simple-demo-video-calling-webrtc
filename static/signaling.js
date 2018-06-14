@@ -31,6 +31,9 @@ socket.on('request-call', ({ caller, candidate, sdp }) => {
   if (candidate) {
     console.log('You got new request, candidate: ', candidate);
     setIceCandidate(candidate, caller);
+    getIceCandidate(caller).then(candidate=> {
+      sendIceCandidate(caller, candidate);
+    })
   }
 
   if (sdp) {
@@ -45,7 +48,13 @@ socket.on('request-call', ({ caller, candidate, sdp }) => {
 
 // recieve answer from user
 socket.on('send-answer', ({ answer, user }) => {
+  console.log(`You got answer from ${user}`, answer);
   setAnswer(answer, user);
+});
+
+socket.on('send-candidate', ({ candidate, user }) => {
+  console.log(`You got candidate from ${user}`, candidate);
+  setIceCandidate(candidate, user);
 });
 
 function setMyId(id) {
@@ -53,6 +62,9 @@ function setMyId(id) {
   myId.innerText = id;
 }
 
+function sendIceCandidate(caller, candidate) {
+  socket.emit('send-candidate', { user: caller, candidate });
+}
 function sendAnswer(caller, answer) {
   socket.emit('send-answer', { user: caller, answer });
 }

@@ -20,6 +20,7 @@ http.listen(PORT, () => {
 io.on('connection', (socket) => {
   console.log('New connection', socket.id);
   io.to(socket.id).emit('welcome', { msg: `You are online now` });
+  console.log('AA',io.sockets.adapter.rooms);
 
   socket.on('room', (data) => {
     roomHandler(data, socket);
@@ -42,6 +43,10 @@ io.on('connection', (socket) => {
     // console.log('send-answer', user, answer);
     io.to(user).emit('send-answer', { answer, user: socket.id });
   });
+
+  socket.on('send-candidate', ({ user, candidate })=> {
+    io.to(user).emit('send-candidate', { candidate, user: socket.id });
+  })
 
   socket.on('disconnect', () => {
     userLeaveRoom(socket.id);

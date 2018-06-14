@@ -1,11 +1,23 @@
 var local, video2, pc1, pc2, localStream;
-var server = { "iceServers": [{ "url": "stun:stun.l.google.com:19302" }] };
+// var server = {
+//   "iceServers": [
+//     { "url": "stun:stun.l.google.com:19302" },
+//     { url: 'turn:192.158.29.39:3478?transport=udp', username: '28224511:1379330808', credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=" }
+//   ]
+// };
+
+var server = {
+  'iceServers': [
+    { 'urls': 'stun:stun.net-ex.io:80' },
+    { 'urls': 'turn:turn.net-ex.io:443?transport=tcp', 'username': 'user', 'credential': 'pass' }
+  ]
+};
 var connections = {}; // use partner socket Id for connection id
 window.connections = connections;
 function start() {
   navigator.mediaDevices.getUserMedia({
     audio: false,
-    video: true
+    video: { width: { exact: 320 }, height: { exact: 240 }, frameRate: { ideal: 10, max: 15 } },
   }).then(stream => {
     addVideoView('local', stream);
     localStream = stream;
@@ -24,7 +36,7 @@ function updateConnectionStore(id, data = {}) {
   const connection = connections[id] || {};
   const newConnection = { ...connection, ...data };
   connections[id] = newConnection;
-  if(data.stream) {
+  if (data.stream) {
     console.log('Add new view');
     addVideoView(id, data.stream);
     displayRemoteStream();
@@ -55,10 +67,13 @@ function getPeer(peerId, opt = {}) {
   const connection = connections[peerId] || {};
   let peer = connection.peer;
   // reuse instance
-  if (peer && !opt.forceNew)
+  if (peer && !opt.forceNew) {
+    console.log('Found peer', peerId);
     return peer;
-  peer = new RTCPeerConnection(server);
+  }
 
+  console.log('Creating new peer', peerId);
+  peer = new RTCPeerConnection(server);
   peer.onaddstream = function (e) {
     console.log('Added new stream', e);
     updateConnectionStore(peerId, { stream: e.stream });
@@ -100,7 +115,8 @@ function getSDP(peerId) {
   const pc = getPeer(peerId);
   return pc.createOffer({
     offerToReceiveAudio: 1,
-    offerToReceiveVideo: 1
+    offerToReceiveVideo: 1,
+    iceRestart: true
   }).then(desc => {
     console.log('Created offer');
     console.log('Doing setLocalDescription')
@@ -114,13 +130,15 @@ function getSDP(peerId) {
 function setSDP(sdp, caller) {
   const pc = getPeer(caller);
   console.log('Doing setRemoteDescription of ', caller);
-  return pc.setRemoteDescription(sdp).then(setRemoteDescriptionSuccess, setRemoteDescriptionError);
+  return pc.setRemoteDescription(new RTCSessionDescription(sdp)).then(setRemoteDescriptionSuccess, setRemoteDescriptionError);
 }
 
 function setIceCandidate(candidate, caller) {
-  const pc = getPeer(caller);
-  console.log('Doing addIceCandidate of ', caller);
-  return pc.addIceCandidate(candidate).then(setIceCandidateSuccess, setIceCandidateError);
+  setTimeout(() => {
+    const pc = getPeer(caller);
+    console.log('Doing addIceCandidate of ', caller);
+    return pc.addIceCandidate(new RTCIceCandidate(candidate)).then(setIceCandidateSuccess, setIceCandidateError);
+  }, 3000)
 }
 
 function getAnswer(peerId) {
@@ -138,11 +156,11 @@ function getAnswer(peerId) {
 function setAnswer(answer, peerId) {
   console.log('Adding answer')
   const pc = getPeer(peerId);
-  pc.setRemoteDescription(answer).then(setRemoteDescriptionSuccess, setRemoteDescriptionError);
+  pc.setRemoteDescription(new RTCSessionDescription(answer)).then(setRemoteDescriptionSuccess, setRemoteDescriptionError);
 }
 
 function displayRemoteStream(stream) {
-  if(!stream) {
+  if (!stream) {
     stream = connections[Object.keys(connections)[0]] && connections[Object.keys(connections)[0]].stream;
   }
 

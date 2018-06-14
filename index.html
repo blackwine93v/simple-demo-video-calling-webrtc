@@ -26,17 +26,17 @@
       <button id="enter-room-btn" onclick="enterRoom()">Enter</button>
 
       <hr />
-      <h2>Online list</h2>
+      <h2>Online list (Select to call)</h2>
       <ul id="online-list">
       </ul>
-
+      <p>Your ID: <span id="my-id"></span></p>
       <hr />
       <h2>Message</h2>
       <div id="message"></div>
     </div>
     <div class="camera-view">
-      <video id="local" autoplay></video>
       <video id="remote" autoplay></video>
+      <div id="remote-video-group"></div>
     </div>
   </div>
 </body>

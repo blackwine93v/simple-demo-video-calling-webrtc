@@ -1,45 +1,92 @@
 var local, video2, pc1, pc2, localStream;
 var server = { "iceServers": [{ "url": "stun:stun.l.google.com:19302" }] };
-var peer;
-
+var connections = {}; // use partner socket Id for connection id
+window.connections = connections;
 function start() {
-  local = document.getElementById('local');
   navigator.mediaDevices.getUserMedia({
-    audio: true,
+    audio: false,
     video: true
   }).then(stream => {
-    local.srcObject = stream;
+    addVideoView('local', stream);
     localStream = stream;
     console.log('Starting local stream');
-    addLocalTrack();
   }).catch(e => {
     throw e;
   })
 }
 
-function getPeer() {
-  peer = peer || new RTCPeerConnection(server);
-  return peer;
+function removeConnection(connectionId) {
+  delete connections[connectionId];
+  displayRemoteStream();
 }
 
-function addLocalTrack() {
-  const pc = getPeer();
+function updateConnectionStore(id, data = {}) {
+  const connection = connections[id] || {};
+  const newConnection = { ...connection, ...data };
+  connections[id] = newConnection;
+  if(data.stream) {
+    console.log('Add new view');
+    addVideoView(id, data.stream);
+    displayRemoteStream();
+  }
+  return connections;
+}
+
+function addVideoView(id, stream) {
+  const groupVideo = document.getElementById('remote-video-group');
+  const videoView = document.createElement('video');
+  videoView.width = 200;
+  videoView.autoplay = true;
+  videoView.id = id;
+  videoView.srcObject = stream;
+  videoView.onclick = displayRemoteStream.bind(this, stream);
+  videoView.className = "clickable";
+  groupVideo.appendChild(videoView);
+}
+
+function removeVideoView(id) {
+  const groupVideo = document.getElementById('remote-video-group');
+  const videoView = document.getElementById(id);
+  groupVideo.removeChild(videoView);
+}
+
+function getPeer(peerId, opt = {}) {
+  console.log('getPeer ', peerId);
+  const connection = connections[peerId] || {};
+  let peer = connection.peer;
+  // reuse instance
+  if (peer && !opt.forceNew)
+    return peer;
+  peer = new RTCPeerConnection(server);
+
+  peer.onaddstream = function (e) {
+    console.log('Added new stream', e);
+    updateConnectionStore(peerId, { stream: e.stream });
+  }
+  console.log('Added localstream to peer');
   localStream.getTracks().forEach(
     function (track) {
-      pc.addTrack(
+      peer.addTrack(
         track,
         localStream
       );
     }
   );
-  console.log('Added localstream to peer');
+
+  updateConnectionStore(peerId, { peer });
+  window.peer = peer;
+
+  return peer;
 }
 
-function getIceCandidate() {
+
+function getIceCandidate(peerId) {
   return new Promise((resolve, reject) => {
     try {
-      const pc = getPeer();
+      console.log('Getting Ice Candidate');
+      const pc = getPeer(peerId);
       pc.onicecandidate = function (e) {
+        console.log('Got Ice Candidate');
         resolve(e.candidate);
       }
     } catch (e) {
@@ -48,9 +95,9 @@ function getIceCandidate() {
   });
 }
 
-function getSDP() {
+function getSDP(peerId) {
   console.log('Creating offer');
-  const pc = getPeer();
+  const pc = getPeer(peerId);
   return pc.createOffer({
     offerToReceiveAudio: 1,
     offerToReceiveVideo: 1
@@ -64,20 +111,20 @@ function getSDP() {
   })
 }
 
-function setSDP(sdp) {
-  const pc = getPeer();
-  console.log('Doing setRemoteDescription')
+function setSDP(sdp, caller) {
+  const pc = getPeer(caller);
+  console.log('Doing setRemoteDescription of ', caller);
   return pc.setRemoteDescription(sdp).then(setRemoteDescriptionSuccess, setRemoteDescriptionError);
 }
 
-function setIceCandidate(candidate) {
-  const pc = getPeer();
-  console.log('Doing addIceCandidate')
+function setIceCandidate(candidate, caller) {
+  const pc = getPeer(caller);
+  console.log('Doing addIceCandidate of ', caller);
   return pc.addIceCandidate(candidate).then(setIceCandidateSuccess, setIceCandidateError);
 }
 
-function getAnswer() {
-  const pc = getPeer();
+function getAnswer(peerId) {
+  const pc = getPeer(peerId);
   console.log('Creating answer')
   return pc.createAnswer().then(desc => {
     console.log('Created answer')
@@ -88,26 +135,20 @@ function getAnswer() {
   })
 }
 
-function setAnswer(answer) {
+function setAnswer(answer, peerId) {
   console.log('Adding answer')
-  const pc = getPeer();
+  const pc = getPeer(peerId);
   pc.setRemoteDescription(answer).then(setRemoteDescriptionSuccess, setRemoteDescriptionError);
 }
 
-function getRemoteStream() {
-  const pc = getPeer();
+function displayRemoteStream(stream) {
+  if(!stream) {
+    stream = connections[Object.keys(connections)[0]] && connections[Object.keys(connections)[0]].stream;
+  }
+
   const remote = document.getElementById('remote');
-  return new Promise((resolve, reject) => {
-    try {
-      pc.ontrack = function (e) {
-        const remoteStream = e.streams[0];
-        remote.srcObject = remoteStream;
-        resolve(remoteStream);
-      }
-    } catch (e) {
-      reject('Get remote stream failed');
-    }
-  })
+  remote.srcObject = stream || null;
+  console.log('Displayed RemoteStream');
 }
 
 function setLocalDescriptionSuccess() {
@@ -133,83 +174,6 @@ function setIceCandidateSuccess() {
 function setIceCandidateError(e) {
   console.log('setIceCandidateError Success', e);
 }
-
-function call() {
-  pc1 = new RTCPeerConnection(server);
-  pc1.onicecandidate = function (e) {
-    e.candidate && pc2.addIceCandidate(e.candidate).then(function () {
-      console.log('pc2 added new candidate', e.candidate);
-    }, function (e) {
-      throw e;
-    })
-  }
-
-
-  pc2 = new RTCPeerConnection(server);
-  pc2.onicecandidate = function (e) {
-    e.candidate && pc1.addIceCandidate(e.candidate).then(function () {
-      console.log('pc1 added new candidate', e.candidate);
-    }, function (e) {
-      throw e;
-    })
-  }
-
-  pc2.ontrack = function (e) {
-    video2 = document.getElementById('video2');
-    if (video2.srcObject !== e.streams[0]) {
-      video2.srcObject = e.streams[0];
-      console.log('Added remote stream');
-    }
-  }
-
-  localStream.getTracks().forEach(
-    function (track) {
-      pc1.addTrack(
-        track,
-        localStream
-      );
-    }
-  );
-  console.log('Added localstream to pc1');
-
-  pc1.createOffer({
-    offerToReceiveAudio: 1,
-    offerToReceiveVideo: 1
-  }).then(function (desc) {
-    pc1.setLocalDescription(desc).then(function () {
-      console.log('pc1 setLocalDescription ok')
-    }, function (e) {
-      console.error('pc1 setLocalDescription failed')
-    });
-
-    pc2.setRemoteDescription(desc).then(function () {
-      console.log('pc2 setRemoteDescription ok')
-    }, function (e) {
-      console.error('pc2 setRemoteDescription failed')
-    });
-
-    pc2.createAnswer().then(function (desc) {
-      pc2.setLocalDescription(desc).then(function () {
-        console.log('pc2 setLocalDescription ok')
-      }, function (e) {
-        console.log('pc2 setLocalDescription failed')
-      })
-
-      pc1.setRemoteDescription(desc).then(function () {
-        console.log('pc1 setRemoteDescription ok')
-      }, function (e) {
-        console.log('pc1 setRemoteDescription failed')
-      })
-    }, function (e) { throw e })
-  }, function (e) { throw e })
-}
-
-function stop() {
-  local = video2 = null;
-  pc1.close();
-  pc2.close();
-}
-
 
 window.onload = function () {
   //start local streaming

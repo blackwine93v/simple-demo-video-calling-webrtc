@@ -5,6 +5,7 @@ window.io = socket;
 
 socket.on('welcome', (data) => {
   showMessage(`Welcome message: ${data.msg}`);
+  setMyId(socket.id);
 });
 
 socket.on('broadcast', (data) => {
@@ -19,27 +20,38 @@ socket.on('update-room-user', ({ users }) => {
   updateRoomUser(users);
 });
 
+socket.on('user-disconnect', ({ user }) => {
+  showMessage(`${user} has leaved`);
+  removeConnection(user);
+  removeVideoView(user);
+});
+
+// receive a call from another user
 socket.on('request-call', ({ caller, candidate, sdp }) => {
   if (candidate) {
     console.log('You got new request, candidate: ', candidate);
-    setIceCandidate(candidate);
+    setIceCandidate(candidate, caller);
   }
 
   if (sdp) {
     console.log('You got new request, sdp: ', sdp);
-    setSDP(sdp).then(() => {
-      getAnswer().then(answer => {
+    setSDP(sdp, caller).then(() => {
+      getAnswer(caller).then(answer => {
         sendAnswer(caller, answer);
       });
     })
   }
-  getRemoteStream();
 });
 
 // recieve answer from user
-socket.on('send-answer', ({ answer })=> {
-  setAnswer(answer);
+socket.on('send-answer', ({ answer, user }) => {
+  setAnswer(answer, user);
 });
+
+function setMyId(id) {
+  const myId = document.getElementById('my-id');
+  myId.innerText = id;
+}
 
 function sendAnswer(caller, answer) {
   socket.emit('send-answer', { user: caller, answer });
@@ -64,17 +76,15 @@ function showMessage(msg) {
 function callToUser(user) {
   console.log('Calling to ', user);
 
-  getSDP().then(desc => {
+  getSDP(user).then(desc => {
     desc && requestCall({ user, sdp: desc });
   });
 
-  getIceCandidate().then(candidate => {
+  getIceCandidate(user).then(candidate => {
     candidate && requestCall({ user, candidate });
   }, e => {
     console.error(e);
   })
-
-  getRemoteStream();
 }
 
 function requestCall(data) {
@@ -91,9 +101,11 @@ function updateRoomUser(users) {
 
     let li = document.createElement('li');
     li.innerText = user;
+    li.className = "clickable";
     li.addEventListener('click', function () {
       callToUser(user);
     });
     roomUser.appendChild(li);
   })
 }
+

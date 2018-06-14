@@ -19,7 +19,7 @@ http.listen(PORT, () => {
 
 io.on('connection', (socket) => {
   console.log('New connection', socket.id);
-  io.to(socket.id).emit('welcome', { msg: `You is online now` });
+  io.to(socket.id).emit('welcome', { msg: `You are online now` });
 
   socket.on('room', (data) => {
     roomHandler(data, socket);
@@ -40,27 +40,58 @@ io.on('connection', (socket) => {
 
   socket.on('send-answer', ({ user, answer }) => {
     // console.log('send-answer', user, answer);
-    io.to(user).emit('send-answer', { answer });
+    io.to(user).emit('send-answer', { answer, user: socket.id });
   });
+
+  socket.on('disconnect', () => {
+    userLeaveRoom(socket.id);
+  })
 });
+
+function userLeaveRoom(userId) {
+  const roomId = findRoomFromUserId(userId);
+
+  if (roomId && rooms[roomId]) {
+    console.log(`${userId} has leaved room ${roomId}`);
+    userDisconnectFromRoom(roomId, userId);
+    delete rooms[roomId][userId];
+    updateRoomUser(roomId, Object.keys(rooms[roomId]));
+  }
+}
+
+function findRoomFromUserId(userId) {
+  let foundRoom;
+  for (roomId of Object.keys(rooms)) {
+    console.log('findRoomFromUserId', roomId)
+    if (rooms[roomId].hasOwnProperty(userId)) {
+      foundRoom = roomId;
+      break;
+    }
+  }
+
+  return foundRoom;
+}
 
 function roomHandler({ room }, socket) {
   console.log('roomHandler', room);
   socket.join(room, () => {
-    rooms[room] = rooms[room] || [];
-    rooms[room].push(socket);
+    rooms[room] = rooms[room] || {};
+    rooms[room][socket.id] = socket;
 
-    console.log('Rooms', Object.keys(rooms).map(room => ({ [room]: rooms[room].length })));
+    console.log('Rooms', Object.keys(rooms).map(room => ({ [room]: Object.keys(rooms[room]).length })));
     // broadcast to each room
     // Object.keys(rooms).map(room=> broadcastRoom(room, `Welcome to room ${room}. We have ${rooms[room].length} online(s).`));
-
-    updateRoomUser(room, rooms[room].map(r => r.id));
+    updateRoomUser(room, Object.keys(rooms[room]));
     broadcastRoom(room, `${socket.id} has joined`);
   })
 }
 
 function broadcastRoom(roomId, msg) {
   io.to(roomId).emit('broadcast', { msg });
+}
+
+function userDisconnectFromRoom(roomId, userId) {
+  io.to(roomId).emit('user-disconnect', { user: userId });
 }
 
 function updateRoomUser(roomId, listOfUser) {

@@ -1,17 +1,11 @@
 var local, video2, pc1, pc2, localStream;
-// var server = {
-//   "iceServers": [
-//     { "url": "stun:stun.l.google.com:19302" },
-//     { url: 'turn:192.158.29.39:3478?transport=udp', username: '28224511:1379330808', credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=" }
-//   ]
-// };
-
 var server = {
-  'iceServers': [
-    { 'urls': 'stun:stun.net-ex.io:80' },
-    { 'urls': 'turn:turn.net-ex.io:443?transport=tcp', 'username': 'user', 'credential': 'pass' }
+  "iceServers": [
+    { "url": "stun:stun.l.google.com:19302" },
+    { url: 'turn:192.158.29.39:3478?transport=udp', username: '28224511:1379330808', credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=" }
   ]
 };
+
 var connections = {}; // use partner socket Id for connection id
 window.connections = connections;
 function start() {
@@ -77,6 +71,9 @@ function getPeer(peerId, opt = {}) {
   peer.onaddstream = function (e) {
     console.log('Added new stream', e);
     updateConnectionStore(peerId, { stream: e.stream });
+  }
+  peer.onnegotiationneeded = function(e) {
+    debugger
   }
   console.log('Added localstream to peer');
   localStream.getTracks().forEach(

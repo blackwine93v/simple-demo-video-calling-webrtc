@@ -1,6 +1,5 @@
 var socket = io();
 var room, message, roomUser;
-
 window.io = socket;
 
 socket.on('welcome', (data) => {

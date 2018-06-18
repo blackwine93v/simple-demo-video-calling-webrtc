@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <script src="/static/socket.io.js"></script>
+  <script src="/lib/jquery/dist/jquery.min.js"></script>
+  <script src="/lib/lodash/lodash.min.js"></script>
+  <script src="/static/ui.js"></script>
+  <script src="/static/signal.js"></script>
+  <script src="/static/controller.js"></script>
+  <script src="/static/utils.js"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+  <title>Video call Demo</title>
+</head>
+
+<body>
+  <div class="container">
+    <div id="control">
+      <h1>Control Panel</h1>
+      <hr />
+
+      <h2>Users</h2>
+      <ul id="user-list">
+      </ul>
+      <span id="my-id"></span>
+      <hr />
+
+      <h2>Messages</h2>
+      <ul id="msg-list"></ul>
+    </div>
+    <div class="camera-view">
+      <video id="remote" autoplay></video>
+      <div id="remote-video-group"></div>
+    </div>
+  </div>
+</body>
+
+</html>
